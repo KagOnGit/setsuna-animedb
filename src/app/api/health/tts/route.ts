@@ -1,7 +1,6 @@
+import { env } from "../../../lib/env";
 export const runtime = "edge";
-import { env } from "@/lib/env";
-
 export async function GET() {
-  if (!env.ELEVENLABS_API_KEY) return new Response(JSON.stringify({ ok: false }), { status: 500 });
-  return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  const ok = Boolean(env.ELEVENLABS_API_KEY);
+  return new Response(JSON.stringify({ ok }), { headers: { "Content-Type": "application/json" } });
 }

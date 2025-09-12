@@ -1,23 +1,15 @@
+import { env } from "../../lib/env";
 export const runtime = "edge";
-
 export async function GET() {
-  const base = new URL(
-    "/api/health/openai",
-    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
-  );
-  const openaiUrl = base.toString();
-  const ttsUrl = new URL("/api/health/tts", base).toString();
-
-  const [o, t] = await Promise.allSettled([
-    fetch(openaiUrl, { cache: "no-store" }),
-    fetch(ttsUrl, { cache: "no-store" }),
-  ]);
-
-  const openai = o.status === "fulfilled" && o.value.ok;
-  const tts = t.status === "fulfilled" && t.value.ok;
-
-  return new Response(JSON.stringify({ openai, tts }), {
-    headers: { "content-type": "application/json" },
+  const openaiOk = Boolean(env.OPENAI_API_KEY);
+  const ttsOk = Boolean(env.ELEVENLABS_API_KEY);
+  const projHint = env.OPENAI_API_KEY.startsWith("sk-proj-") && !env.OPENAI_PROJECT ? "missing_project" : "ok";
+  
+  return new Response(JSON.stringify({ 
+    openai: openaiOk, 
+    tts: ttsOk,
+    project: projHint
+  }), { 
+    headers: { "Content-Type": "application/json" } 
   });
 }
-

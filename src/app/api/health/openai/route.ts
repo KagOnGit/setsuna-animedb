@@ -1,7 +1,7 @@
+import { env } from "../../../lib/env";
 export const runtime = "edge";
-import { env } from "@/lib/env";
-
 export async function GET() {
-  if (!env.OPENAI_API_KEY) return new Response(JSON.stringify({ ok: false }), { status: 500 });
-  return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" } });
+  const ok = Boolean(env.OPENAI_API_KEY);
+  const projHint = env.OPENAI_API_KEY.startsWith("sk-proj-") && !env.OPENAI_PROJECT ? "missing_project" : "ok";
+  return new Response(JSON.stringify({ ok, project: projHint }), { headers: { "Content-Type": "application/json" } });
 }

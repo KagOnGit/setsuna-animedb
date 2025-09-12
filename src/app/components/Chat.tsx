@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useStore } from "@/lib/store";
+import { useStore } from "../lib/store";
 // Intents/tools disabled for now; streaming LLM handles replies
-import { ttsBus } from "@/lib/audioBus";
+import { ttsBus } from "../lib/audioBus";
 
 export default function Chat({ onNeedMic, onEmotion }: { onNeedMic?: () => Promise<void> | void, onEmotion?: (e: {emotion: string; intensity: number}) => void }) {
   const { messages, addMessage, ttsEnabled, setTTSEnabled } = useStore();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [diag, setDiag] = useState<{ openai?: boolean; tts?: boolean } | null>(null);
+  const [diag, setDiag] = useState<{ openai?: boolean; tts?: boolean; project?: string } | null>(null);
   const [hideDiag, setHideDiag] = useState(false);
   const [fallbackNote, setFallbackNote] = useState<string | null>(null);
   const [ctrl, setCtrl] = useState<AbortController | null>(null);
@@ -110,7 +110,12 @@ export default function Chat({ onNeedMic, onEmotion }: { onNeedMic?: () => Promi
               useStore.setState((st) => ({ messages: st.messages.map((m) => (m.id === draftId ? { ...m, text: finalText } : m)) }));
             } else if (json.meta?.fallback) {
               fallback = true;
-              setFallbackNote(json.meta?.reason || "fallback");
+              const reason = json.meta?.reason || "fallback";
+              if (reason === "auth") {
+                setFallbackNote("OpenAI auth/project mismatch. If your key starts with sk-proj-, add OPENAI_PROJECT in .env and redeploy.");
+              } else {
+                setFallbackNote(`Cloud's moody tonight (fallback: ${reason}). I'll still tease you—what's your vibe?`);
+              }
             } else if (json.done) {
               if (!fallback && ttsEnabled && finalText.trim()) await ttsBus.speak(finalText);
             }
@@ -138,12 +143,13 @@ export default function Chat({ onNeedMic, onEmotion }: { onNeedMic?: () => Promi
         <div className="diagBanner">
           <span style={{ fontWeight: 600 }}>Diagnostics:</span>&nbsp;
           {diag?.openai ? "OpenAI ✅" : "OpenAI ❌"} · {diag?.tts ? "TTS ✅" : "TTS ❌"}
+          {diag?.project === "missing_project" && " · Project ⚠️"}
           <button className="btn" onClick={() => setHideDiag(true)} style={{ marginLeft: 8 }}>Dismiss</button>
         </div>
       )}
       {fallbackNote && (
         <div className="diagBanner">
-          Cloud’s moody tonight (fallback: {fallbackNote}). I’ll still tease you—what’s your vibe?
+          {fallbackNote}
           <button className="btn" onClick={() => setFallbackNote(null)} style={{ marginLeft: 8 }}>Dismiss</button>
         </div>
       )}

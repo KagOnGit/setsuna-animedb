@@ -1,12 +1,15 @@
 export const runtime = "edge";
-import { env } from "@/lib/env";
-import { resolveVoiceId } from "@/lib/eleven";
+import { env } from "../../lib/env";
+import { resolveVoiceId } from "../../lib/eleven";
 
 export async function POST(req: Request) {
   try {
     if (!env.ELEVENLABS_API_KEY) return new Response("Missing ELEVENLABS_API_KEY", { status: 500 });
+    
     const { text } = await req.json();
-    if (!text || typeof text !== "string" || !text.trim()) return new Response("Missing text", { status: 400 });
+    if (!text || typeof text !== "string" || !text.trim()) {
+      return new Response("Missing text", { status: 400 });
+    }
 
     // Resolve voice ID (supports voice name in env)
     let voiceId: string;
