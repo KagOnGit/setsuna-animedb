@@ -1,0 +1,40 @@
+{
+  "name": "animedb-website",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "preflight": "node -r dotenv/config ./scripts/preflight.js dotenv_config_path=.env.local",
+    "predev": "node -r dotenv/config ./scripts/preflight.js dotenv_config_path=.env.local",
+    "prebuild": "node -r dotenv/config ./scripts/preflight.js dotenv_config_path=.env.local",
+    "env:print": "node -e \"require('dotenv').config({path:'.env.local'});console.log('OPENAI',!!process.env.OPENAI_API_KEY,'EL',!!process.env.ELEVENLABS_API_KEY)\""
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "dotenv": "^17.2.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@pixiv/three-vrm": "^3.4.2",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/three": "^0.180.0",
+    "graphql": "^16.11.0",
+    "graphql-request": "^7.2.0",
+    "next": "^14.2.32",
+    "openai": "^4.104.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.180.0",
+    "typescript": "^5.9.2",
+    "yaml": "^2.5.1",
+    "zustand": "^5.0.8"
+  }
+}

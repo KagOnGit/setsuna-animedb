@@ -1,0 +1,351 @@
+:root {
+  --bg: #0e0f12;
+  --panel: #171920;
+  --text: #e6e6e6;
+  --muted: #9aa0a6;
+  --accent: #6ea8fe;
+}
+
+html, body {
+  padding: 0;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  height: 100%;
+}
+
+.app-container {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 12px;
+  width: 100vw;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 12px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid #232532;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.avatar-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.loading {
+  position: absolute;
+  z-index: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.5);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.chat-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.messages {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+.message {
+  margin-bottom: 10px;
+}
+
+.message .role {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid #232532;
+  padding: 10px;
+}
+
+.input-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #2b2f3f;
+  background: #0f1118;
+  color: var(--text);
+}
+
+.input-row button {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #2b2f3f;
+  background: var(--accent);
+  color: #0d1117;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .app-container {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(300px, auto);
+  }
+}
+
+/* ---- App Shell v2 ---- */
+:root{
+  --sidebar-w: 380px; /* legacy */
+  --chat-w: 520px;   /* fixed chat width (tweakable) */
+  --gap: 16px;
+  --panel-bg: rgba(16,18,24,0.8);
+  --panel-br: 12px;
+  --panel-border: 1px solid rgba(255,255,255,0.06);
+  --bg: #0f1115;
+}
+
+/* App shell */
+main.app, .app {
+  height: 100dvh;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(520px, 1fr) var(--chat-w);
+  grid-template-rows: 100%;
+  gap: var(--gap);
+  padding: var(--gap);
+  box-sizing: border-box;
+  max-width: none;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+}
+
+/* Avatar pane */
+.avatarPane {
+  position: relative;
+  background: #0b0d12;
+  border-radius: var(--panel-br);
+  border: var(--panel-border);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.avatarCanvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Small overlay button container top-left (doesn't overlap controls on right) */
+.avatarOverlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 8px;
+  z-index: 5;
+}
+
+/* Chat pane */
+.chatPane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0b0d12;
+  border-radius: var(--panel-br);
+  border: var(--panel-border);
+  overflow: hidden;
+  min-width: 0; /* allow flexible shrink without overflow */
+  width: 100%;
+  margin: 0;
+  justify-self: stretch;
+}
+
+/* Messages area scrolls; never under the footer */
+.chatScroll {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 16px 18px 0 18px;
+  min-height: 0; /* ensure flex child can shrink to allow footer to stick */
+}
+
+/* Sticky footer with controls & input */
+.chatFooter {
+  position: sticky;
+  bottom: 0;
+  background: #0b0d12;
+  border-top: 1px solid #1b2130;
+  padding: 12px 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  z-index: 2;
+}
+
+.controlsRow {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.slidersRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.inputRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+/* Generic small button style for overlays */
+.btn {
+  background: #1b2332;
+  color: #dbe7ff;
+  border: var(--panel-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.select,
+.input,
+.range {
+  width: 100%;
+}
+
+/* Viseme tuner panel: hidden by default, draggable, non-blocking when hidden */
+.visemePanel {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 1000;
+  display: none; /* toggle to block */
+  background: rgba(12,16,24,0.92);
+  backdrop-filter: blur(6px);
+  color: #e7f2ff;
+  border: var(--panel-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-width: 240px;
+}
+.visemePanel.hidden {
+  display: none;
+  pointer-events: none;
+}
+.visemePanel .drag {
+  cursor: move;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ----- Controls header adjustments (non-overlapping) ----- */
+.controlsRow { display: grid; grid-template-columns: auto 1fr; align-items: end; column-gap: 12px; row-gap: 8px; margin-bottom: 10px; }
+
+.voiceGroup { display: grid; grid-template-rows: auto auto; }
+.voiceGroup label { font-size: 12px; line-height: 1; color: #aab2c0; margin-bottom: 4px; }
+
+.select { width: 100%; min-width: 0; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+.voiceGroup select { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+
+@media (max-width: 900px) {
+  main.app, .app { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+  .chatPane { order: 2; }
+  .controlsRow { grid-template-columns: 1fr; }
+  .slidersRow { grid-template-columns: 1fr; }
+}
+/* ===== App Shell Grid (override) ===== */
+html, body {
+  height: 100%;
+  margin: 0;
+}
+:root {
+  --chat-w: clamp(420px, 34vw, 560px);
+}
+main.app {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr var(--chat-w);
+  grid-template-rows: 100%;
+  gap: 0;
+  overflow: hidden;
+}
+.avatarPane, .chatPane { height: 100%; }
+.avatarPane { position: relative; overflow: hidden; }
+.avatarCanvas { width: 100%; height: 100%; position: relative; }
+.chatPane { display: flex; flex-direction: column; min-width: 0; }
+.chatScroll { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+.chatFooter {
+  position: sticky;
+  bottom: 0;
+  background: rgba(20,22,26,.85);
+  backdrop-filter: blur(6px);
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.controlsRow, .inputRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: end;
+}
+.controlsRow .left { display:flex; gap:8px; align-items:center; }
+.controlsRow .right { display:flex; justify-content:flex-end; gap:8px; }
+.slidersRow { display:none; }
+.btn, .input {
+  border-radius: 8px;
+  background: #1f2430;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+  padding: 8px 10px;
+}
+.input { width: 100%; }
+@media (max-width: 900px) {
+  main.app { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+  .controlsRow, .inputRow { grid-template-columns: 1fr; }
+}
+.visemePanel.hidden { display:none; pointer-events:none; }
+
+/* Diagnostics banner (dev only) */
+.diagBanner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  padding: 6px 8px;
+  margin: 8px 12px 0 12px;
+  border-radius: 8px;
+  background: rgba(255, 196, 0, 0.12);
+  border: 1px solid rgba(255, 196, 0, 0.35);
+  color: #ffd070;
+}
