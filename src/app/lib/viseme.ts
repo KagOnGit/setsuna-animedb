@@ -26,7 +26,8 @@ export class VisemeEngine {
 
   constructor(private analyser: AnalyserNode, private settings: VisemeSettings) {
     this.buf = new Array(this.size).fill(null).map(()=>({rms:0,a:0,e:0,i:0,o:0,u:0}));
-    this.analyser.smoothingTimeConstant = 0.02;
+    this.analyser.smoothingTimeConstant = 0.015;
+    try { this.analyser.fftSize = 1024; } catch {}
   }
 
   setAnalyser(a: AnalyserNode) { this.analyser = a; }
@@ -107,9 +108,9 @@ export class VisemeEngine {
 export const FAST_VISEME_DEFAULTS: VisemeSettings = {
   gate: 0.015,
   sensitivity: 12,
-  attack: 0.20,
-  decay: 0.35,
-  latencyMs: 90,
+  attack: 0.18,
+  decay: 0.30,
+  latencyMs: 70,
   bandA: [1, 6],
   bandE: [6, 20],
   bandI: [20, 50],

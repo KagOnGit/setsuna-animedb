@@ -1,57 +1,56 @@
 export const runtime = "edge";
-import { env } from "../../lib/env";
-import { resolveVoiceId } from "../../lib/eleven";
+import type { NextRequest } from "next/server";
+import { env } from "@/lib/env";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    if (!env.ELEVENLABS_API_KEY) return new Response("Missing ELEVENLABS_API_KEY", { status: 500 });
-    
     const { text } = await req.json();
-    if (!text || typeof text !== "string" || !text.trim()) {
-      return new Response("Missing text", { status: 400 });
+    const voiceId = env.ELEVEN_VOICE_ID;
+    if (!text || !env.ELEVENLABS_API_KEY || !voiceId) {
+      return new Response(JSON.stringify({ error: "tts_unavailable" }), { status: 503, headers: { "content-type": "application/json" } });
     }
 
-    // Resolve voice ID (supports voice name in env)
-    let voiceId: string;
-    try {
-      voiceId = await resolveVoiceId(env.ELEVEN_VOICE_ID, env.ELEVENLABS_API_KEY);
-    } catch (e: any) {
-      try { console.error("Voice resolve error:", e?.message || String(e)); } catch {}
-      return new Response("tts_voice_error", { status: 500 });
-    }
-
-    const MODEL = env.ELEVEN_MODEL_ID;
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?optimize_streaming_latency=2&output_format=mp3_44100_128`;
-    const body = {
-      text,
-      model_id: MODEL,
-      voice_settings: {
-        stability: 0.16,
-        similarity_boost: 0.95,
-        style: 0.90,
-        use_speaker_boost: true,
-      },
-    };
-
-    const upstream = await fetch(url, {
+    const upstream = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
       method: "POST",
       headers: {
+        accept: "audio/mpeg",
         "xi-api-key": env.ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-        Accept: "audio/mpeg",
+        "content-type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        text,
+        model_id: env.ELEVEN_MODEL_ID || "eleven_multilingual_v2",
+        optimize_streaming_latency: 2,
+        output_format: "mp3_44100_192",
+        voice_settings: {
+          stability: 0.12,
+          similarity_boost: 0.99,
+          style: 0.98,
+          use_speaker_boost: true,
+        },
+      }),
     });
 
-    if (!upstream.ok || !upstream.body) {
-      try { console.error("ElevenLabs TTS error:", upstream.status); } catch {}
-      return new Response("tts_error", { status: upstream.status || 500 });
+    const ct = upstream.headers.get("content-type") || "";
+    if (upstream.ok && ct.includes("audio/mpeg")) {
+      return new Response(upstream.body, {
+        status: 200,
+        headers: {
+          "content-type": "audio/mpeg",
+          "cache-control": "no-store",
+          "x-tts": "elevenlabs",
+          "x-voice-id": String(voiceId).slice(-8),
+        },
+      });
     }
-    return new Response(upstream.body, {
-      headers: { "Content-Type": "audio/mpeg" },
-    });
-  } catch (e) {
-    try { console.error("TTS route error"); } catch {}
-    return new Response("tts_route_error", { status: 500 });
+
+    let detail: any = null;
+    try { detail = await upstream.json(); } catch {}
+    const codeBase = detail?.detail?.status === "quota_exceeded" || detail?.status === "quota_exceeded" ? 402 : (upstream.status || 502);
+    const code = codeBase === 401 ? 502 : codeBase;
+    const body = JSON.stringify({ error: "tts_error", status: upstream.status, detail });
+    return new Response(body, { status: code, headers: { "content-type": "application/json" } });
+  } catch {
+    return new Response(JSON.stringify({ error: "bad_request" }), { status: 400 });
   }
 }

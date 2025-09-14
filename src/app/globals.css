@@ -303,6 +303,7 @@ main.app {
 .avatarPane, .chatPane { height: 100%; }
 .avatarPane { position: relative; overflow: hidden; }
 .avatarCanvas { width: 100%; height: 100%; position: relative; }
+.avatarCanvas canvas { display: block; width: 100%; height: 100%; }
 .chatPane { display: flex; flex-direction: column; min-width: 0; }
 .chatScroll { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
 .chatFooter {

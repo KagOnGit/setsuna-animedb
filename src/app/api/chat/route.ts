@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import OpenAI from "openai";
-import { env } from "@/lib/env";
+import { env } from "../../lib/env";
 export const runtime = "edge";
 
 const SYSTEM = `

@@ -3,10 +3,10 @@
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { VRM, VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName } from "@pixiv/three-vrm";
+import { VRM, VRMLoaderPlugin, VRMUtils, VRMExpressionPresetName, VRMHumanBoneName } from "@pixiv/three-vrm";
+import { loadPose, applyVRMPoseHard, type VRMPoseFile } from '@/lib/vrmPose';
 import { VisemeEngine, FAST_VISEME_DEFAULTS, VisemeSettings } from "@/lib/viseme";
 import { useStore } from "@/lib/store";
-import { ttsBus } from "@/lib/audioBus";
 
 type Props = {
   ttsAnalyser?: AnalyserNode | null;
@@ -21,10 +21,72 @@ export default function Avatar({ ttsAnalyser, useMic, emotion }: Props) {
   const micCtxRef = useRef<AudioContext | null>(null);
   const vrmRef = useRef<VRM | null>(null);
   const visemeRef = useRef<VisemeEngine | null>(null);
+  const lastEmotionRef = useRef<string>("");
   const lastAnalyserRef = useRef<AnalyserNode | null>(null);
   const presetRef = useRef<{A:string;E:string;I:string;O:string;U:string}>({A:"A",E:"E",I:"I",O:"O",U:"U"});
+  const poseLockedRef = useRef(false);
+  const poseDataRef = useRef<any>(null);
 
   let VISEME_SETTINGS: VisemeSettings = { ...FAST_VISEME_DEFAULTS };
+
+  // Dainty idle pose
+  function applyDaintyPose(vrm: VRM) {
+    const h = vrm.humanoid;
+    if (!h) return;
+
+    const d2r = THREE.MathUtils.degToRad;
+
+    const L_UP = h.getNormalizedBoneNode(VRMHumanBoneName.LeftUpperArm);
+    const R_UP = h.getNormalizedBoneNode(VRMHumanBoneName.RightUpperArm);
+    const L_LO = h.getNormalizedBoneNode(VRMHumanBoneName.LeftLowerArm);
+    const R_LO = h.getNormalizedBoneNode(VRMHumanBoneName.RightLowerArm);
+    const HEAD = h.getNormalizedBoneNode(VRMHumanBoneName.Head);
+    const SPINE = h.getNormalizedBoneNode(VRMHumanBoneName.Spine);
+
+    // grounded, not floaty
+    if (L_UP) L_UP.rotation.set(d2r(-12), d2r(6),  d2r(-8));
+    if (R_UP) R_UP.rotation.set(d2r(-12), d2r(-6), d2r( 8));
+    if (L_LO) L_LO.rotation.set(d2r(-8), 0, 0);
+    if (R_LO) R_LO.rotation.set(d2r(-8), 0, 0);
+
+    // gentle posture & head tilt
+    if (SPINE) SPINE.rotation.set(d2r(2), 0, 0);
+    if (HEAD)  HEAD.rotation.set(d2r(2), d2r(-6), d2r(2));
+  }
+
+  // Auto-frame helper
+  function frameToFit(
+    object: THREE.Object3D,
+    camera: THREE.PerspectiveCamera,
+    container: HTMLElement,
+    opts?: { margin?: number; faceBias?: number }
+  ) {
+    const margin = opts?.margin ?? 0.16;
+    const faceBias = opts?.faceBias ?? 0.10;
+  
+    // NEW: keep camera projection in sync with container size
+    const aspect = Math.max(0.0001, container.clientWidth / Math.max(1, container.clientHeight));
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+  
+    const box = new THREE.Box3().setFromObject(object);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+  
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = (camera.fov * Math.PI) / 180;
+    let distance = (maxDim / 2) / Math.tan(fov / 2);
+    distance *= (1 + margin);
+  
+    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+    camera.position.copy(center.clone().add(dir.multiplyScalar(distance)));
+  
+    camera.position.y += size.y * faceBias;
+    camera.near = distance / 100;
+    camera.far  = distance * 100;
+    camera.updateProjectionMatrix();
+    camera.lookAt(center);
+  }
 
   function setExpr(vrm: VRM, name: string, val: number) {
     if (!vrm?.expressionManager) return;
@@ -154,9 +216,10 @@ export default function Avatar({ ttsAnalyser, useMic, emotion }: Props) {
     // load VRM
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
+    // pose is enforced via frame loop lock for first second; no other rigs when locked
     loader.load(
       "/models/setsuna.vrm",
-      (gltf) => {
+      async (gltf) => {
         vrm = gltf.userData.vrm as VRM;
         if (vrm) {
           VRMUtils.removeUnnecessaryJoints(vrm.scene);
@@ -166,6 +229,73 @@ export default function Avatar({ ttsAnalyser, useMic, emotion }: Props) {
           });
           scene!.add(vrm.scene);
           vrmRef.current = vrm;
+          // Disable LookAt/SpringBones that can mutate bones automatically
+          try {
+            if ((vrm as any).lookAt) {
+              (vrm as any).lookAt.target = null;
+              if ((vrm as any).lookAt.applierType !== undefined) {
+                (vrm as any).lookAt.applierType = 'none';
+              }
+            }
+            (vrm as any).springBoneManager?.reset?.();
+            (vrm as any).springBoneManager?.joints?.forEach?.((j: any) => {
+              j.stiffness = 0;
+              j.gravityPower = 0;
+            });
+          } catch {}
+          // --- force Standing pose ---
+          try {
+            const POSE_URL = '/poses/Standing%20(1).json';
+            const raw = await loadPose(POSE_URL);
+            // Compat: support files that use { data: { bone: { rotation:[x,y,z,w] } } }
+            const pose: VRMPoseFile = ((): VRMPoseFile => {
+              if ((raw as any)?.bones) return raw as VRMPoseFile;
+              const data = (raw as any)?.data;
+              if (data && typeof data === 'object') {
+                const bones: Record<string, any> = {};
+                for (const [k, v] of Object.entries<any>(data)) {
+                  const r = v?.rotation;
+                  if (Array.isArray(r) && r.length === 4) {
+                    bones[k] = { rotation: { x: r[0], y: r[1], z: r[2], w: r[3] } };
+                  }
+                }
+                return { bones } as VRMPoseFile;
+              }
+              return raw as VRMPoseFile;
+            })();
+            poseDataRef.current = pose as VRMPoseFile;
+            applyVRMPoseHard(vrm, poseDataRef.current, {
+              space: "unity",
+              invert: { x: true, y: false, z: true },
+              mix: 1
+            });
+            poseLockedRef.current = true;
+            // keep enforcing for the first second to beat late initializers
+            let frames = 60;
+            const enforce = () => {
+              if (frames-- > 0 && vrmRef.current && poseLockedRef.current && poseDataRef.current) {
+                applyVRMPoseHard(vrmRef.current, poseDataRef.current, {
+                  space: "unity",
+                  invert: { x: true, y: false, z: true },
+                  mix: 1
+                });
+                requestAnimationFrame(enforce);
+              }
+            };
+            requestAnimationFrame(enforce);
+            console.info('[VRM] Standing pose applied & locked from', POSE_URL);
+          } catch (e) {
+            console.warn('[VRM] Failed to apply standing pose', e);
+          }
+          // Initial frame to fit container
+          try {
+            const container = containerRef.current!;
+            renderer!.setSize(container.clientWidth, container.clientHeight, false);
+            renderer!.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+            frameToFit(vrm.scene, camera!, container, { margin: 0.16, faceBias: 0.10 });
+            (window as any).__fitAvatar = () => frameToFit(vrm!.scene, camera!, container, { margin: 0.16, faceBias: 0.10 });
+          } catch {}
+          // Rig disabled while Standing pose is locked
           try {
             const names = (vrm as any)?.expressionManager?.expressions?.map?.((e: any) => e.expressionName) ?? "(none)";
             console.log("[VRM] Available expressions:", names);
@@ -181,33 +311,18 @@ export default function Avatar({ ttsAnalyser, useMic, emotion }: Props) {
       }
     );
 
-    // camera & framing
-    const frameVrm = () => {
-      if (!camera) return;
-      camera.position.set(0, 1.45, 2.4);
-      try {
-        const head = vrmRef.current?.humanoid?.getBoneNode('head' as any);
-        if (head) {
-          const hp = new THREE.Vector3();
-          head.getWorldPosition(hp);
-          camera.lookAt(hp);
-        } else {
-          camera.lookAt(new THREE.Vector3(0, 1.45, 0));
-        }
-      } catch {
-        camera.lookAt(new THREE.Vector3(0, 1.45, 0));
-      }
-    };
 
     const resize = () => {
-      if (!renderer || !camera || !el) return;
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / Math.max(1, h);
-      camera.updateProjectionMatrix();
-      frameVrm();
-    };
+        if (!renderer || !camera || !el) return;
+        const w = Math.max(1, el.clientWidth);
+        const h = Math.max(1, el.clientHeight);
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        if (vrmRef.current) {
+          frameToFit(vrmRef.current.scene, camera, el, { margin: 0.16, faceBias: 0.10 });
+        }
+      };
     const observer = new ResizeObserver(resize);
     resize();
     observer.observe(el);
@@ -232,6 +347,7 @@ export default function Avatar({ ttsAnalyser, useMic, emotion }: Props) {
       raf = requestAnimationFrame(loop);
       const delta = clock.getDelta();
       if (vrm) {
+        // (pose locked) No sway/rig – expressions only
         // Final priority logic: TTS wins when speaking; mic resumes when TTS stops
         const talking = (window as any).__isTTSSpeaking?.() === true;
         const ana = (ttsAnalyser && talking)
@@ -335,12 +451,14 @@ export default function Avatar({ ttsAnalyser, useMic, emotion }: Props) {
         if (keySurprised) vrm.expressionManager?.setValue(keySurprised, surprised);
         if (keyNeutral) vrm.expressionManager?.setValue(keyNeutral, neutral);
 
-        // Subtle head tilt
-        if (vrm.humanoid?.getBoneNode("head" as any)) {
-          const head = vrm.humanoid.getBoneNode("head" as any)!;
-          head.rotation.z = THREE.MathUtils.lerp(head.rotation.z, listenTilt, 0.2);
-        }
+        // Update VRM first (expressions, internal managers)
         vrm.update(delta);
+        // Then enforce the pose last so it wins over any changes
+        if (poseLockedRef.current && vrmRef.current && poseDataRef.current) {
+          try { applyVRMPoseHard(vrmRef.current, poseDataRef.current); } catch {}
+        } else {
+          // Place any bone-modifying logic here if re-enabled in future.
+        }
       }
       renderer!.render(scene!, camera!);
     };
@@ -359,6 +477,8 @@ export default function Avatar({ ttsAnalyser, useMic, emotion }: Props) {
       setAvatarLoaded(false);
     };
   }, [setAvatarLoaded, ttsAnalyser, useMic]);
+
+  // Rig-based bone triggers removed while pose is locked to Standing
 
   useEffect(() => {
     // Debug meters overlay, hidden by default, toggle with 'M'
